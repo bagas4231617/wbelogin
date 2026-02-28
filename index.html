@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login dengan Firebase - Admin View (Fixed)</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            width: 500px;
+            max-width: 100%;
+            padding: 40px;
+            transition: all 0.3s ease;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+        }
+
+        .logout-btn {
+            background: #e53e3e;
+        }
+
+        .logout-btn:hover {
+            background: #c53030;
+        }
+
+        .user-list {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .user-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .user-item p {
+            margin: 5px 0;
+            word-break: break-all;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .error-message {
+            color: #e53e3e;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .note {
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Container Login (default tampil) -->
+    <div class="container" id="loginContainer">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Masukkan email valid" required>
+                <div class="error-message" id="emailError">Email tidak valid</div>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Minimal 6 karakter" required>
+                <div class="error-message" id="passwordError">Password minimal 6 karakter</div>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <p class="note">selamat datang</p>
+        <div id="firebaseError" style="color: red; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+
+    <!-- Container Admin Dashboard -->
+    <div class="container" id="adminContainer" style="display: none;">
+        <h2>Dashboard Admin</h2>
+        <div id="userList" class="user-list">
+            <div class="loading">Memuat data...</div>
+        </div>
+        <button class="logout-btn" id="logoutBtn">Logout</button>
+        <p class="note">* Data user yang login akan muncul realtime</p>
+    </div>
+
+    <!-- Container User Portfolio -->
+    <div class="container" id="portfolioContainer" style="display: none;">
+        <h2>Portofolio Saya</h2>
+        <div style="text-align: center; margin: 20px 0;">
+            <img src="https://via.placeholder.com/300x200?text=Portfolio+Image" alt="Portfolio"
+                style="max-width:100%; border-radius:10px;">
+            <p style="margin-top:20px;">Selamat datang di portofolio saya! Saya seorang web developer.</p>
+            <p>Hubungi: user@example.com</p>
+        </div>
+        <button class="logout-btn" id="logoutBtn2">Logout</button>
+    </div>
+
+    <script>
+        // Konfigurasi Firebase - GANTI DENGAN MILIK ANDA!
+        const firebaseConfig = {
+            apiKey: "AIzaSyB6RgK9YxUaCweOq3bjXk2R4rhe_QDwJ1A",
+            authDomain: "logindemo-98ef2.firebaseapp.com",
+            databaseURL: "https://logindemo-98ef2-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "logindemo-98ef2",
+            storageBucket: "logindemo-98ef2.firebasestorage.app",
+            messagingSenderId: "738470678330",
+            appId: "1:738470678330:web:93957995546adc9aca8a03",
+            measurementId: "G-DTYD3X2JLY"
+        };
+
+        // Inisialisasi Firebase dengan penanganan error
+        let database;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            console.log('Firebase initialized');
+        } catch (error) {
+            console.error('Firebase init error:', error);
+            document.getElementById('firebaseError').style.display = 'block';
+            document.getElementById('firebaseError').innerText = 'Gagal terhubung ke database. Periksa konfigurasi Firebase.';
+        }
+
+        // Referensi ke tabel users (hanya jika database tersedia)
+        const usersRef = database ? database.ref('users') : null;
+
+        // Elemen DOM
+        const loginContainer = document.getElementById('loginContainer');
+        const adminContainer = document.getElementById('adminContainer');
+        const portfolioContainer = document.getElementById('portfolioContainer');
+        const loginForm = document.getElementById('loginForm');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const logoutBtn2 = document.getElementById('logoutBtn2');
+        const userListDiv = document.getElementById('userList');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const emailError = document.getElementById('emailError');
+        const passwordError = document.getElementById('passwordError');
+        const firebaseErrorDiv = document.getElementById('firebaseError');
+
+        // Validasi email
+        function isValidEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        // Validasi password minimal 6 karakter
+        function isValidPassword(password) {
+            return password.length >= 6;
+        }
+
+        // Cek status login dari sessionStorage
+        function checkLoginStatus() {
+            const loggedIn = sessionStorage.getItem('loggedIn');
+            const role = sessionStorage.getItem('role');
+            if (loggedIn === 'true') {
+                if (role === 'admin') {
+                    showAdminDashboard();
+                } else {
+                    showPortfolio();
+                }
+            } else {
+                // Pastikan login container tampil
+                loginContainer.style.display = 'block';
+                adminContainer.style.display = 'none';
+                portfolioContainer.style.display = 'none';
+            }
+        }
+
+        // Tampilkan admin dashboard dan mulai mendengarkan data user
+        function showAdminDashboard() {
+            loginContainer.style.display = 'none';
+            portfolioContainer.style.display = 'none';
+            adminContainer.style.display = 'block';
+
+            if (!usersRef) {
+                userListDiv.innerHTML = '<p style="color:red;">Database tidak tersedia. Periksa Firebase.</p>';
+                return;
+            }
+
+            // Mulai listen data user dari Firebase
+            usersRef.on('value', (snapshot) => {
+                const users = snapshot.val();
+                let html = '';
+                if (users) {
+                    // Urutkan berdasarkan timestamp terbaru
+                    const userArray = Object.entries(users).map(([key, value]) => ({ key, ...value }));
+                    userArray.sort((a, b) => b.timestamp - a.timestamp);
+                    userArray.forEach(user => {
+                        html += `
+                            <div class="user-item">
+                                <p><strong>Email:</strong> ${user.email || 'tidak ada'}</p>
+                                <p><strong>Password:</strong> ${user.password || 'tidak ada'}</p>
+                                <p class="timestamp">Login: ${user.timestamp ? new Date(user.timestamp).toLocaleString() : 'tidak diketahui'}</p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html = '<p>Belum ada user yang login.</p>';
+                }
+                userListDiv.innerHTML = html;
+            }, (error) => {
+                console.error('Firebase read error:', error);
+                userListDiv.innerHTML = '<p style="color:red;">Gagal membaca data.</p>';
+            });
+        }
+
+        // Tampilkan halaman portofolio user
+        function showPortfolio() {
+            loginContainer.style.display = 'none';
+            adminContainer.style.display = 'none';
+            portfolioContainer.style.display = 'block';
+        }
+
+        // Fungsi logout
+        function logout() {
+            sessionStorage.clear();
+            loginContainer.style.display = 'block';
+            adminContainer.style.display = 'none';
+            portfolioContainer.style.display = 'none';
+            loginForm.reset();
+            emailError.style.display = 'none';
+            passwordError.style.display = 'none';
+            // Hentikan listener Firebase (opsional)
+            if (usersRef) {
+                usersRef.off();
+            }
+        }
+
+        // Event login
+        loginForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            // Validasi
+            let valid = true;
+            if (!isValidEmail(email)) {
+                emailError.style.display = 'block';
+                valid = false;
+            } else {
+                emailError.style.display = 'none';
+            }
+
+            if (!isValidPassword(password)) {
+                passwordError.style.display = 'block';
+                valid = false;
+            } else {
+                passwordError.style.display = 'none';
+            }
+
+            if (!valid) return;
+
+            // Tentukan role (admin jika email mengandung @admin.com)
+            const isAdmin = email.includes('@admin.com');
+            const role = isAdmin ? 'admin' : 'user';
+
+            // Simpan data ke Firebase (hanya jika user biasa dan database tersedia)
+            if (!isAdmin && usersRef) {
+                usersRef.push({
+                    email: email,
+                    password: password, // Catatan: tidak aman, hanya untuk demo
+                    timestamp: Date.now()
+                }).catch(error => {
+                    console.error('Firebase write error:', error);
+                    alert('Gagal menyimpan data login, tetapi Anda tetap bisa melanjutkan.');
+                });
+            } else if (!isAdmin && !usersRef) {
+                alert('Database tidak tersedia. Data tidak disimpan.');
+            }
+
+            // Simpan session
+            sessionStorage.setItem('email', email);
+            sessionStorage.setItem('password', password);
+            sessionStorage.setItem('loggedIn', 'true');
+            sessionStorage.setItem('role', role);
+
+            // Redirect
+            if (isAdmin) {
+                showAdminDashboard();
+            } else {
+                showPortfolio();
+            }
+        });
+
+        // Event logout
+        logoutBtn.addEventListener('click', logout);
+        logoutBtn2.addEventListener('click', logout);
+
+        // Cek status saat halaman dimuat
+        window.addEventListener('load', function () {
+            checkLoginStatus();
+            // Jika Firebase error, tampilkan pesan di login
+            if (!database) {
+                firebaseErrorDiv.style.display = 'block';
+                firebaseErrorDiv.innerText = 'Firebase tidak terinisialisasi. Periksa konfigurasi.';
+            }
+        });
+
+        // Jika pengguna menekan tombol back, tetap cek status
+        window.addEventListener('pageshow', checkLoginStatus);
+    </script>
+</body>
+
+</html>
